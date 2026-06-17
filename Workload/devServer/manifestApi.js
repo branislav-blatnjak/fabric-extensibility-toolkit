@@ -34,32 +34,10 @@ const rateLimit = createRateLimit(
 );
 
 /**
- * OPTIONS handler for CORS preflight requests
+ * Builds the dev parameters payload that Fabric reads to configure the workload frontend.
  */
-router.options('/manifests_new{*path}', (req, res) => {
-  res.header({
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400' // 24 hours
-  });
-  res.sendStatus(204); // No content needed for OPTIONS response
-  console.log("[Frontend] Handled CORS preflight request for manifest endpoint.");
-});
-
-/**
- * GET /manifests_new/metadata
- * Returns metadata about the manifest
- */
-router.get('/manifests_new/metadata', rateLimit, (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-  });
- 
-  const devParameters = {
+function buildDevParameters() {
+  return {
     name: process.env.WORKLOAD_NAME,
     url: "http://127.0.0.1:60006",
     devAADFEAppConfig: {
@@ -73,8 +51,87 @@ router.get('/manifests_new/metadata', rateLimit, (req, res) => {
     //If you enable Sandbox Relaxation, make sure to also enable it in the manifest package and vica versa.
     devSandboxRelaxation: false
   };
- 
-  res.end(JSON.stringify({ extension: devParameters }));
+}
+
+const MANIFEST_JSON_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
+const CORS_PREFLIGHT_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400' // 24 hours
+};
+
+// ---------------------------------------------------------------------------
+// /manifests  (the path Fabric calls — webpack historyApiFallback was shadowing
+// this because no route existed at /manifests, causing index.html to be returned
+// instead of JSON)
+// ---------------------------------------------------------------------------
+
+router.options('/manifests{*path}', (req, res) => {
+  res.header(CORS_PREFLIGHT_HEADERS);
+  res.sendStatus(204);
+  console.log("[Frontend] Handled CORS preflight for /manifests.");
+});
+
+/**
+ * GET /manifests
+ * Returns the workload frontend configuration as JSON.
+ * Fabric's portal calls this path (at WorkloadEndpointURL/manifests) to load the workload.
+ */
+router.get('/manifests', rateLimit, (req, res) => {
+  res.writeHead(200, MANIFEST_JSON_HEADERS);
+  res.end(JSON.stringify({ extension: buildDevParameters() }));
+  console.log("[Frontend] Delivered manifest JSON at /manifests.");
+});
+
+/**
+ * GET /manifests/metadata
+ * Alias — some Fabric versions and the DevGateway probe this sub-path.
+ */
+router.get('/manifests/metadata', rateLimit, (req, res) => {
+  res.writeHead(200, MANIFEST_JSON_HEADERS);
+  res.end(JSON.stringify({ extension: buildDevParameters() }));
+  console.log("[Frontend] Delivered manifest JSON at /manifests/metadata.");
+});
+
+/**
+ * GET /manifest.json
+ * Fabric also probes this path (singular, .json extension). Unlike /manifests,
+ * historyApiFallback does not intercept .json extension paths, so without this
+ * route the request returns a hard 404 instead of index.html.
+ */
+router.get('/manifest.json', rateLimit, (req, res) => {
+  res.writeHead(200, MANIFEST_JSON_HEADERS);
+  res.end(JSON.stringify({ extension: buildDevParameters() }));
+  console.log("[Frontend] Delivered manifest JSON at /manifest.json.");
+});
+
+// ---------------------------------------------------------------------------
+// /manifests_new  (original routes — kept for DevGateway compatibility)
+// ---------------------------------------------------------------------------
+
+/**
+ * OPTIONS handler for CORS preflight requests
+ */
+router.options('/manifests_new{*path}', (req, res) => {
+  res.header(CORS_PREFLIGHT_HEADERS);
+  res.sendStatus(204); // No content needed for OPTIONS response
+  console.log("[Frontend] Handled CORS preflight request for manifest endpoint.");
+});
+
+/**
+ * GET /manifests_new/metadata
+ * Returns metadata about the manifest
+ */
+router.get('/manifests_new/metadata', rateLimit, (req, res) => {
+  res.writeHead(200, MANIFEST_JSON_HEADERS);
+  res.end(JSON.stringify({ extension: buildDevParameters() }));
   console.log("[Frontend] Delivered manifest metainformation successfully.");
 });
 

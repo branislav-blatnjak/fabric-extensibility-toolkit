@@ -184,8 +184,13 @@ if($IsWindows){
 } else {
     # On Mac and Linux, we need to use mono to run the script
     # alternatively, we could use dotnet tool if available
-    # nuget pack $nuspecFile -OutputDirectory $outputDir -Verbosity detailed 2>&1   
+    # nuget pack $nuspecFile -OutputDirectory $outputDir -Verbosity detailed 2>&1
     mono $nugetPath pack $nuspecPath -OutputDirectory $outputDir -Verbosity detailed
+}
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "NuGet pack failed with exit code $LASTEXITCODE. ManifestPackage was NOT created."
+    exit $LASTEXITCODE
 }
 
 Write-Host "✅ Created the new ManifestPackage in $outputDir." -ForegroundColor Blue
